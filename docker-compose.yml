@@ -25,9 +25,9 @@ services:
   frontend:
     build: ./frontend/
     volumes:
-      - static:/frontend_build  # Временная директория для build файлов
+      - static:/app/collected_static  # Исправлено
     command: >
-      sh -c "cp -r /app/build/. /frontend_build/ &&
+      sh -c "cp -r /app/build/. /app/collected_static/ &&
              echo 'Frontend files copied'"
     depends_on:
       - backend

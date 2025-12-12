@@ -1,3 +1,4 @@
+# docker-compose.production.yml
 version: '3.8'
 
 volumes:
@@ -32,9 +33,9 @@ services:
   frontend:
     image: gevork23/kittygram_frontend:latest
     volumes:
-      - static:/frontend_build
+      - static:/app/collected_static
     command: >
-      sh -c "cp -r /app/build/. /frontend_build/ &&
+      sh -c "cp -r /app/build/. /app/collected_static/ &&
              echo 'Frontend files copied'"
     depends_on:
       - backend
