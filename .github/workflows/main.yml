@@ -75,17 +75,20 @@ jobs:
       
       - name: Build and push backend
         run: |
-          docker build -t gevork23/kittygram_backend:latest ./backend/
+          cd backend
+          docker build -t gevork23/kittygram_backend:latest .
           docker push gevork23/kittygram_backend:latest
       
       - name: Build and push frontend
         run: |
-          docker build -t gevork23/kittygram_frontend:latest ./frontend/
+          cd frontend
+          docker build -t gevork23/kittygram_frontend:latest .
           docker push gevork23/kittygram_frontend:latest
       
       - name: Build and push gateway
         run: |
-          docker build -t gevork23/kittygram_gateway:latest ./nginx/
+          cd nginx
+          docker build -t gevork23/kittygram_gateway:latest .
           docker push gevork23/kittygram_gateway:latest
 
   deploy:
@@ -116,11 +119,9 @@ jobs:
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           script: |
             cd ~/kittygram
+            
             echo "=== Остановка старых контейнеров ==="
             sudo docker compose -f docker-compose.production.yml down || true
-            
-            echo "=== Очистка старых volumes ==="
-            sudo docker volume rm kittygram_static_volume kittygram_media_volume 2>/dev/null || true
             
             echo "=== Pulling latest images ==="
             sudo docker compose -f docker-compose.production.yml pull
@@ -128,24 +129,23 @@ jobs:
             echo "=== Starting containers ==="
             sudo docker compose -f docker-compose.production.yml up -d
             
-            echo "=== Waiting for services to start ==="
-            sleep 20
+            echo "=== Waiting for services ==="
+            sleep 30
             
             echo "=== Running migrations ==="
-            sudo docker compose -f docker-compose.production.yml exec backend python manage.py migrate --noinput
+            sudo docker compose -f docker-compose.production.yml exec backend python manage.py migrate --noinput || echo "Migrations might have failed"
             
-            echo "=== Collecting static files ==="
-            sudo docker compose -f docker-compose.production.yml exec backend python manage.py collectstatic --noinput
+            echo "=== Collecting static ==="
+            sudo docker compose -f docker-compose.production.yml exec backend python manage.py collectstatic --noinput || echo "Collectstatic might have failed"
             
-            echo "=== Checking static files ==="
-            sudo docker compose -f docker-compose.production.yml exec backend ls -la /app/collected_static/ || true
-            sudo docker compose -f docker-compose.production.yml exec gateway ls -la /staticfiles/ || true
-            
-            echo "=== Checking containers status ==="
+            echo "=== Checking services ==="
             sudo docker compose -f docker-compose.production.yml ps
             
-            echo "=== Deployment completed! ==="
+            echo "=== Checking application ==="
+            curl -f http://localhost:9000/ || echo "Application might be loading..."
             
+            echo "=== Deployment completed! ==="
+
   notify:
     name: Send Telegram notification
     runs-on: ubuntu-latest

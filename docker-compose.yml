@@ -1,10 +1,3 @@
-version: '3.8'
-
-volumes:
-  pg_data:
-  static_volume:
-  media_volume:
-
 services:
   db:
     image: postgres:13.10
@@ -20,8 +13,8 @@ services:
     build: ./backend/
     env_file: .env
     volumes:
-      - static_volume:/app/collected_static  # Для Django collectstatic
-      - media_volume:/app/media              # Для медиа файлов Django
+      - static:/app/collected_static  # Для collectstatic
+      - media:/app/media              # Для медиа файлов
     depends_on:
       - db
     command: >
@@ -32,10 +25,10 @@ services:
   frontend:
     build: ./frontend/
     volumes:
-      - static_volume:/frontend_static
+      - static:/frontend_build  # Временная директория для build файлов
     command: >
-      sh -c "cp -r /app/build/. /frontend_static/ &&
-             cp -r /frontend_static/* /app/collected_static/ || true"
+      sh -c "cp -r /app/build/. /frontend_build/ &&
+             echo 'Frontend files copied'"
     depends_on:
       - backend
 
@@ -44,8 +37,13 @@ services:
     ports:
       - "9000:80"
     volumes:
-      - static_volume:/staticfiles   # Путь в контейнере Nginx
-      - media_volume:/media          # Путь в контейнере Nginx
+      - static:/static  # Nginx будет искать статику здесь
+      - media:/media
     depends_on:
       - backend
       - frontend
+
+volumes:
+  pg_data:
+  static:
+  media:

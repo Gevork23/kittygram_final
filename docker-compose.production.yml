@@ -2,8 +2,8 @@ version: '3.8'
 
 volumes:
   pg_data:
-  static_volume:
-  media_volume:
+  static:
+  media:
 
 services:
   db:
@@ -20,8 +20,8 @@ services:
     image: gevork23/kittygram_backend:latest
     env_file: .env
     volumes:
-      - static_volume:/app/collected_static
-      - media_volume:/app/media
+      - static:/app/collected_static
+      - media:/app/media
     depends_on:
       - db
     command: >
@@ -32,10 +32,10 @@ services:
   frontend:
     image: gevork23/kittygram_frontend:latest
     volumes:
-      - static_volume:/frontend_static
+      - static:/frontend_build
     command: >
-      sh -c "cp -r /app/build/. /frontend_static/ &&
-             cp -r /frontend_static/* /app/collected_static/ || true"
+      sh -c "cp -r /app/build/. /frontend_build/ &&
+             echo 'Frontend files copied'"
     depends_on:
       - backend
 
@@ -44,8 +44,8 @@ services:
     ports:
       - "9000:80"
     volumes:
-      - static_volume:/staticfiles
-      - media_volume:/media
+      - static:/static
+      - media:/media
     depends_on:
       - backend
       - frontend
