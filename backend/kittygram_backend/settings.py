@@ -4,11 +4,11 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.getenv('SECRET_KEY').strip('"').strip("'")
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-default-key').strip('"').strip("'")
 
 DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',')
+ALLOWED_HOSTS = [host.strip() for host in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if host]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -60,7 +60,7 @@ DATABASES = {
         'NAME': os.getenv('POSTGRES_DB', 'kittygram'),
         'USER': os.getenv('POSTGRES_USER', 'kittygram_user'),
         'PASSWORD': os.getenv('POSTGRES_PASSWORD', ''),
-        'HOST': os.getenv('DB_HOST', 'db'),        # имя контейнера БД
+        'HOST': os.getenv('DB_HOST', 'db'),
         'PORT': os.getenv('DB_PORT', '5432'),
     }
 }
@@ -95,7 +95,7 @@ USE_L10N = True
 USE_TZ = True
 
 STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+STATIC_ROOT = os.path.join(BASE_DIR, 'collected_static')  # ИЗМЕНИТЬ СЮДА
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')

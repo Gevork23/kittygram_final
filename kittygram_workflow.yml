@@ -53,7 +53,7 @@ jobs:
         run: npm ci
       
       - name: Run tests
-        run: npm test -- --watchAll=false
+        run: npm test
 
   build-and-push:
     name: Build and push Docker images
@@ -73,20 +73,26 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       
-      - name: Build and push backend
-        run: |
-          docker build -t gevork23/kittygram_backend:latest ./backend/
-          docker push gevork23/kittygram_backend:latest
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: gevork23/kittygram_backend:latest
       
-      - name: Build and push frontend
-        run: |
-          docker build -t gevork23/kittygram_frontend:latest ./frontend/
-          docker push gevork23/kittygram_frontend:latest
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: gevork23/kittygram_frontend:latest
       
-      - name: Build and push gateway
-        run: |
-          docker build -t gevork23/kittygram_gateway:latest ./nginx/
-          docker push gevork23/kittygram_gateway:latest
+      - name: Build and push gateway image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./nginx
+          push: true
+          tags: gevork23/kittygram_gateway:latest
 
   deploy:
     name: Deploy to production
@@ -116,36 +122,24 @@ jobs:
           passphrase: ${{ secrets.SSH_PASSPHRASE }}
           script: |
             cd ~/kittygram
-            echo "=== Остановка старых контейнеров ==="
-            sudo docker compose -f docker-compose.production.yml down || true
-            
-            echo "=== Очистка старых volumes ==="
-            sudo docker volume rm kittygram_static_volume kittygram_media_volume 2>/dev/null || true
-            
-            echo "=== Pulling latest images ==="
+            echo "Pulling latest images..."
             sudo docker compose -f docker-compose.production.yml pull
-            
-            echo "=== Starting containers ==="
-            sudo docker compose -f docker-compose.production.yml up -d
-            
-            echo "=== Waiting for services to start ==="
-            sleep 20
-            
-            echo "=== Running migrations ==="
+            echo "Starting containers..."
+            sudo docker compose -f docker-compose.production.yml up -d --build
+            sleep 10
+            echo "Running migrations..."
             sudo docker compose -f docker-compose.production.yml exec backend python manage.py migrate --noinput
-            
-            echo "=== Collecting static files ==="
+            echo "Collecting static files..."
             sudo docker compose -f docker-compose.production.yml exec backend python manage.py collectstatic --noinput
-            
-            echo "=== Checking static files ==="
-            sudo docker compose -f docker-compose.production.yml exec backend ls -la /app/collected_static/ || true
-            sudo docker compose -f docker-compose.production.yml exec gateway ls -la /staticfiles/ || true
-            
-            echo "=== Checking containers status ==="
-            sudo docker compose -f docker-compose.production.yml ps
-            
-            echo "=== Deployment completed! ==="
-            
+            echo "Copying frontend static files..."
+            sudo docker compose -f docker-compose.production.yml exec frontend sh -c "cp -r /app/build/. /frontend_static/"
+            echo "Copying backend static files..."
+            sudo docker compose -f docker-compose.production.yml exec backend sh -c "cp -r /app/collected_static/. /staticfiles/"
+            echo "Setting permissions..."
+            sudo docker compose -f docker-compose.production.yml exec backend sh -c "chmod -R 755 /staticfiles"
+            sudo docker compose -f docker-compose.production.yml exec backend sh -c "chmod -R 755 /media"
+            echo "Deployment completed!"
+
   notify:
     name: Send Telegram notification
     runs-on: ubuntu-latest
@@ -169,9 +163,9 @@ jobs:
           MESSAGE="${STATUS} ${EMOJI}
           Репозиторий: ${{ github.repository }}
           Ветка: ${{ github.ref_name }}
-          Коммит: ${GITHUB_SHA::7}
-          Сайт: https://oski.myftp.biz/"
+          Коммит: ${GITHUB_SHA::7}"
           
           curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
             -d chat_id="${TELEGRAM_CHAT_ID}" \
-            -d text="$MESSAGE"
+            -d text="$MESSAGE" \
+            -d parse_mode="HTML"

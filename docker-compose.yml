@@ -1,37 +1,51 @@
+version: '3.8'
+
 volumes:
   pg_data:
-  static:
-  media:
-  
+  static_volume:
+  media_volume:
+
 services:
   db:
     image: postgres:13.10
     env_file: .env
     volumes:
       - pg_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
   backend:
     build: ./backend/
     env_file: .env
     volumes:
-      - static:/app/static
-      - media:/app/media
+      - static_volume:/app/collected_static  # Для Django collectstatic
+      - media_volume:/app/media              # Для медиа файлов Django
     depends_on:
-      - db  
+      - db
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py collectstatic --noinput &&
+             gunicorn --bind 0.0.0.0:8000 kittygram_backend.wsgi"
+
   frontend:
-    env_file: .env
     build: ./frontend/
-    command: sh -c "cp -r /app/build/static/* /static/ && cp /app/build/index.html /static/"
     volumes:
-      - static:/static
+      - static_volume:/frontend_static
+    command: >
+      sh -c "cp -r /app/build/. /frontend_static/ &&
+             cp -r /frontend_static/* /app/collected_static/ || true"
     depends_on:
       - backend
+
   gateway:
     build: ./nginx/
-    env_file: .env
     ports:
       - "9000:80"
     volumes:
-      - static:/static
-      - media:/media
+      - static_volume:/staticfiles   # Путь в контейнере Nginx
+      - media_volume:/media          # Путь в контейнере Nginx
     depends_on:
+      - backend
       - frontend
