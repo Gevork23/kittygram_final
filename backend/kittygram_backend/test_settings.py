@@ -1,20 +1,29 @@
-# backend/kittygram_backend/test_settings.py
+from pathlib import Path
 from .settings import *
-import os
 
-# Используем SQLite для тестов
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Use sqlite for tests
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 
-# Ускоряем тесты
+# Disable password hashing for faster tests
 PASSWORD_HASHERS = [
     'django.contrib.auth.hashers.MD5PasswordHasher',
 ]
 
-# Отключаем для тестов
-DEBUG = True
-SECRET_KEY = 'test-secret-key-for-ci'
+# Test secret key
+SECRET_KEY = 'test-secret-key'
+
+# Disable debug for tests
+DEBUG = False
+
+# Disable allowed hosts check
+ALLOWED_HOSTS = ['testserver']
+
+# Use console email backend
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
