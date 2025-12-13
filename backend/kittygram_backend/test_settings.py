@@ -1,9 +1,26 @@
 from pathlib import Path
-from .settings import *
+import sys
+from os.path import dirname, abspath
+
+# Добавляем родительскую директорию в путь Python
+sys.path.insert(0, dirname(dirname(abspath(__file__))))
+
+# Импортируем настройки как модуль
+try:
+    from kittygram_backend import settings as base_settings
+except ImportError:
+    import sys
+    sys.path.append(dirname(dirname(dirname(abspath(__file__)))))
+    from kittygram_backend import settings as base_settings
+
+# Копируем все атрибуты из базовых настроек в текущий модуль
+for attr in dir(base_settings):
+    if not attr.startswith('_'):
+        globals()[attr] = getattr(base_settings, attr)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Use sqlite for tests
+# Переопределяем только нужные настройки
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -11,19 +28,11 @@ DATABASES = {
     }
 }
 
-# Disable password hashing for faster tests
 PASSWORD_HASHERS = [
     'django.contrib.auth.hashers.MD5PasswordHasher',
 ]
 
-# Test secret key
 SECRET_KEY = 'test-secret-key'
-
-# Disable debug for tests
 DEBUG = False
-
-# Disable allowed hosts check
 ALLOWED_HOSTS = ['testserver']
-
-# Use console email backend
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
