@@ -1,6 +1,6 @@
-from pathlib import Path
 import sys
-from os.path import dirname, abspath
+from os.path import abspath, dirname
+from pathlib import Path
 
 # Добавляем родительскую директорию в путь Python
 sys.path.insert(0, dirname(dirname(abspath(__file__))))
