@@ -1,10 +1,11 @@
-#!/bin/sh
+# backend/entrypoint.sh должен быть:
+#!/bin/bash
 
-echo "Apply database migrations"
+# Миграции
 python manage.py migrate --noinput
 
-echo "Collect static files"
+# Сбор статики
 python manage.py collectstatic --noinput
 
-echo "Starting server"
-gunicorn --bind 0.0.0.0:8000 kittygram_backend.wsgi
+# Запуск Gunicorn
+exec gunicorn kittygram_backend.wsgi:application --bind 0.0.0.0:8000
