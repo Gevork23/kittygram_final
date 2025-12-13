@@ -38,3 +38,4 @@ services:
     volumes:
       - django_static_volume:/usr/share/nginx/html/static/
       - media_volume:/usr/share/nginx/html/media/
+#ewfsedfsdfsd
