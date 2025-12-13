@@ -20,7 +20,7 @@ services:
     image: gevork23/kittygram_backend:latest
     env_file: .env
     volumes:
-      - django_static_volume:/app/static  # Volume подключен к /app/static
+      - django_static_volume:/app/static
       - media_volume:/app/media
     command: >
       sh -c "python manage.py migrate --noinput &&
