@@ -1,3 +1,10 @@
+version: '3.8'
+
+volumes:
+  pg_data:
+  static:
+  media:
+
 services:
   db:
     image: postgres:13.10
@@ -13,37 +20,24 @@ services:
     build: ./backend/
     env_file: .env
     volumes:
-      - static:/app/collected_static  # Для collectstatic
-      - media:/app/media              # Для медиа файлов
+      - static:/app/collected_static
+      - media:/app/media
     depends_on:
       - db
-    command: >
-      sh -c "python manage.py migrate --noinput &&
-             python manage.py collectstatic --noinput &&
-             gunicorn --bind 0.0.0.0:8000 kittygram_backend.wsgi"
 
   frontend:
     build: ./frontend/
     volumes:
-      - static:/app/collected_static  # Исправлено
-    command: >
-      sh -c "cp -r /app/build/. /app/collected_static/ &&
-             echo 'Frontend files copied'"
-    depends_on:
-      - backend
+      - static:/app/build/
+    command: cp -r /app/build/. /app/collected_static/
 
   gateway:
     build: ./nginx/
     ports:
       - "9000:80"
     volumes:
-      - static:/static  # Nginx будет искать статику здесь
+      - static:/static
       - media:/media
     depends_on:
       - backend
       - frontend
-
-volumes:
-  pg_data:
-  static:
-  media:

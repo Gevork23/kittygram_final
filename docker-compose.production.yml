@@ -1,17 +1,16 @@
-# docker-compose.production.yml
 version: '3.8'
 
 volumes:
-  pg_data:
-  static:
-  media:
+  pg_data_production:
+  static_volume:
+  media_volume:
 
 services:
   db:
     image: postgres:13.10
     env_file: .env
     volumes:
-      - pg_data:/var/lib/postgresql/data
+      - pg_data_production:/var/lib/postgresql/data
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -21,32 +20,24 @@ services:
     image: gevork23/kittygram_backend:latest
     env_file: .env
     volumes:
-      - static:/app/collected_static
-      - media:/app/media
+      - static_volume:/app/collected_static
+      - media_volume:/app/media
     depends_on:
       - db
-    command: >
-      sh -c "python manage.py migrate --noinput &&
-             python manage.py collectstatic --noinput &&
-             gunicorn --bind 0.0.0.0:8000 kittygram_backend.wsgi"
 
   frontend:
     image: gevork23/kittygram_frontend:latest
     volumes:
-      - static:/app/collected_static
-    command: >
-      sh -c "cp -r /app/build/. /app/collected_static/ &&
-             echo 'Frontend files copied'"
-    depends_on:
-      - backend
+      - static_volume:/app/build/
+    command: cp -r /app/build/. /app/collected_static/
 
   gateway:
     image: gevork23/kittygram_gateway:latest
     ports:
       - "9000:80"
     volumes:
-      - static:/static
-      - media:/media
+      - static_volume:/static
+      - media_volume:/media
     depends_on:
       - backend
       - frontend
