@@ -2,7 +2,7 @@ version: '3.8'
 
 volumes:
   pg_data_production:
-  static_volume:
+  django_static_volume:    # Volume для статики Django
   media_volume:
 
 services:
@@ -20,28 +20,21 @@ services:
     image: gevork23/kittygram_backend:latest
     env_file: .env
     volumes:
-      - static_volume:/app/static
+      - django_static_volume:/app/static  # Volume подключен к /app/static
       - media_volume:/app/media
     command: >
       sh -c "python manage.py migrate --noinput &&
              python manage.py collectstatic --noinput &&
+             # Копируем Django статику из collected_static в static
+             cp -r /app/collected_static/. /app/static/ &&
              gunicorn kittygram_backend.wsgi:application --bind 0.0.0.0:8000"
     depends_on:
       - db
 
   frontend:
     image: gevork23/kittygram_frontend:latest
-    volumes:
-      - static_volume:/app/static
-    command: sh -c "npm run build && cp -r /app/build/* /app/static/"
-
-  gateway:
-    image: gevork23/kittygram_gateway:latest
     ports:
       - "9000:80"
     volumes:
-      - static_volume:/static
-      - media_volume:/media
-    depends_on:
-      - backend
-      - frontend
+      - django_static_volume:/usr/share/nginx/html/static/
+      - media_volume:/usr/share/nginx/html/media/

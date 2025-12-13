@@ -2,7 +2,7 @@ version: '3.8'
 
 volumes:
   pg_data:
-  static:
+  django_static_volume:
   media:
 
 services:
@@ -20,24 +20,19 @@ services:
     build: ./backend/
     env_file: .env
     volumes:
-      - static:/app/collected_static
+      - django_static_volume:/app/static
       - media:/app/media
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py collectstatic --noinput &&
+             cp -r /app/collected_static/. /app/static/ &&
+             gunicorn kittygram_backend.wsgi:application --bind 0.0.0.0:8000"
     depends_on:
       - db
 
   frontend:
     build: ./frontend/
     volumes:
-      - static:/app/build/
-    command: cp -r /app/build/. /app/collected_static/
-
-  gateway:
-    build: ./nginx/
+      - django_static_volume:/usr/share/nginx/html/static/
     ports:
       - "9000:80"
-    volumes:
-      - static:/static
-      - media:/media
-    depends_on:
-      - backend
-      - frontend

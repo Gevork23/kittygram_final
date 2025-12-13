@@ -5,7 +5,7 @@ on:
     branches: [ main ]
 
 jobs:
-  test-backend:
+  tests_backend:
     name: Test backend
     runs-on: ubuntu-latest
     
@@ -19,29 +19,23 @@ jobs:
         ports:
           - 5432:5432
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
-    
+
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      - name: Check out code
+        uses: actions/checkout@v3
       
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
       
-      - name: Install backend dependencies
+      - name: Install dependencies
         run: |
-          cd backend
-          pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install flake8 pytest pytest-django
+          python -m pip install --upgrade pip setuptools
+          pip install flake8==6.0.0 flake8-isort==7.0.0
+          pip install -r ./backend/requirements.txt
       
-      - name: Run flake8
-        run: |
-          cd backend
-          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics || echo "Flake8 completed"
-      
-      - name: Run Django tests (skip external connection tests)
+      - name: Test with flake8 and django tests
         env:
           POSTGRES_USER: kittygram_user
           POSTGRES_PASSWORD: kittygram_password
@@ -50,181 +44,170 @@ jobs:
           DB_PORT: 5432
           SECRET_KEY: test-secret-key
           DEBUG: True
-          DJANGO_SETTINGS_MODULE: kittygram_backend.test_settings
         run: |
-          cd backend
-          # Запускаем только тесты которые не требуют внешних подключений
-          python -m pytest ../tests/ -v -k "not connection" --tb=short || echo "Some tests might have failed due to external dependencies"
+          python -m flake8 backend/
+          cd backend/
+          python manage.py test
 
-  test-frontend:
+  tests_frontend:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./frontend
-    
+
     steps:
-      - uses: actions/checkout@v4
-      
+      - uses: actions/checkout@v3
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '18'
-      
-      - name: Install dependencies
-        run: npm ci
-      
-      - name: Run tests
-        run: npm test -- --watchAll=false
 
-  build-and-push-backend:
-    name: Build and push backend
+      - name: Install dependencies
+        run: |
+          cd frontend/
+          npm ci
+
+      - name: Test frontend
+        run: |
+          cd frontend/
+          npm run test
+
+  build_and_push_backend:
     runs-on: ubuntu-latest
-    needs: test-backend
-    
+    needs: tests_backend
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-      
+      - name: Check out the repo
+        uses: actions/checkout@v3
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      
-      - name: Login to DockerHub
-        uses: docker/login-action@v3
+        uses: docker/setup-buildx-action@v2
+      - name: Login to Docker 
+        uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-      
       - name: Build and push backend
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v4
         with:
-          context: ./backend
+          context: ./backend/
           push: true
           tags: gevork23/kittygram_backend:latest
 
-  build-and-push-frontend:
+  build_and_push_frontend:
     name: Build and push frontend
     runs-on: ubuntu-latest
-    needs: test-frontend
-    
+    needs: tests_frontend
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
-      
+      - name: Check out the repo
+        uses: actions/checkout@v3
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      
-      - name: Login to DockerHub
-        uses: docker/login-action@v3
+        uses: docker/setup-buildx-action@v2
+      - name: Login to Docker 
+        uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-      
       - name: Build and push frontend
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v4
         with:
-          context: ./frontend
+          context: ./frontend/
           push: true
           tags: gevork23/kittygram_frontend:latest
 
-  build-and-push-gateway:
+  build_and_push_gateway:
+    name: Build and push gateway
     runs-on: ubuntu-latest
-    
     steps:
-      - uses: actions/checkout@v4
-      
+      - name: Check out the repo
+        uses: actions/checkout@v3
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      
-      - name: Login to DockerHub
-        uses: docker/login-action@v3
+        uses: docker/setup-buildx-action@v2
+      - name: Login to Docker 
+        uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-      
       - name: Build and push gateway
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v4
         with:
-          context: ./nginx
+          context: ./nginx/
           push: true
           tags: gevork23/kittygram_gateway:latest
 
   deploy:
-    name: Deploy via SSH
-    uses: appleboy/ssh-action@v1.0.0
-    with:
-      host: ${{ secrets.HOST }}
-      username: ${{ secrets.USER }}
-      key: ${{ secrets.SSH_KEY }}
-      script: |
-        cd ~/kittygram
-      
-        # Останавливаем все контейнеры
-        echo "=== Stopping all containers ==="
-        sudo docker compose -f docker-compose.production.yml down || true
-      
-        # Удаляем старые контейнеры и образы
-        echo "=== Cleaning up ==="
-        sudo docker system prune -af || true
-      
-        # Проверяем .env
-        if [ ! -f ".env" ]; then
-          cp .env.example .env
-          echo "Created .env from example"
-        fi
-      
-        # Проверяем и добавляем необходимые переменные
-        if ! grep -q "CSRF_TRUSTED_ORIGINS" .env; then
-          echo "CSRF_TRUSTED_ORIGINS=https://oski.myftp.biz" >> .env
-        fi
-      
-        if ! grep -q "DEBUG" .env; then
-          echo "DEBUG=False" >> .env
-        fi
-      
-        # Выводим .env для отладки (без паролей)
-        echo "=== .env content (sanitized) ==="
-        grep -v "PASSWORD\|SECRET" .env
-      
-        echo "=== Pulling latest images ==="
-        sudo docker compose -f docker-compose.production.yml pull
-      
-        echo "=== Starting containers ==="
-        sudo docker compose -f docker-compose.production.yml up -d --build --force-recreate
-      
-        echo "=== Waiting for services ==="
-        sleep 30
-      
-        echo "=== Checking running containers ==="
-        sudo docker ps
-      
-        echo "=== Running migrations ==="
-        sudo docker compose -f docker-compose.production.yml exec -T backend python manage.py migrate --noinput
-      
-        echo "=== Collecting static ==="
-        sudo docker compose -f docker-compose.production.yml exec -T backend python manage.py collectstatic --noinput
-      
-        echo "=== Fixing permissions ==="
-        sudo chmod -R 755 ~/kittygram || true
-      
-        echo "=== Restarting to apply changes ==="
-        sudo docker compose -f docker-compose.production.yml restart
-      
-        echo "=== Checking logs ==="
-        sudo docker compose -f docker-compose.production.yml logs --tail=20
-      
-        echo "=== Testing connectivity ==="
-        echo "Testing internal connectivity..."
-        curl -f http://localhost:9000/ && echo "✓ Internal connection works" || echo "✗ Internal connection failed"
-      
-        echo "Testing external connectivity..."
-        curl -f https://oski.myftp.biz/ && echo "✓ External connection works" || echo "✗ External connection failed"
-      
-        echo "=== Checking ports ==="
-        sudo netstat -tlnp | grep 9000 || echo "Port 9000 not listening"
-      
-        echo "=== Deployment completed! ==="
+    runs-on: ubuntu-latest
+    needs: 
+      - build_and_push_backend
+      - build_and_push_frontend
+      - build_and_push_gateway
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+    
+      - name: Copy files via ssh
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SSH_KEY }}
+          source: "docker-compose.production.yml,.env.example"
+          target: "kittygram"
+    
+      - name: Executing remote ssh commands to deploy
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            # Установка docker-compose если нет
+            if ! command -v docker-compose &> /dev/null; then
+              echo "Installing docker-compose..."
+              sudo apt update
+              sudo apt install docker-compose -y
+            fi
 
-  notify:
+            cd kittygram
+
+            # Проверяем наличие .env файла
+            if [ ! -f ".env" ]; then
+              echo "ERROR: .env file not found! Please create .env file on the server."
+              echo "You can use .env.example as a template:"
+              echo "cp .env.example .env"
+              echo "Then edit .env with your settings."
+              exit 1
+            fi
+
+            echo "Using existing .env file"
+          
+            echo "=== Pulling latest images ==="
+            sudo docker pull gevork23/kittygram_backend:latest || true
+            sudo docker pull gevork23/kittygram_frontend:latest || true
+            sudo docker pull gevork23/kittygram_gateway:latest || true
+          
+            echo "=== Stopping old containers ==="
+            sudo docker-compose -f docker-compose.production.yml down || true
+          
+            echo "=== Starting new containers ==="
+            sudo docker-compose -f docker-compose.production.yml up -d
+          
+            echo "=== Waiting for services ==="
+            sleep 30
+          
+            echo "=== Running migrations ==="
+            sudo docker-compose -f docker-compose.production.yml exec -T backend python manage.py migrate --noinput
+          
+            echo "=== Collecting static ==="
+            sudo docker-compose -f docker-compose.production.yml exec -T backend python manage.py collectstatic --noinput
+          
+            echo "=== Restarting to apply changes ==="
+            sudo docker-compose -f docker-compose.production.yml restart
+          
+            echo "=== Checking services ==="
+            sudo docker-compose -f docker-compose.production.yml ps
+          
+            echo "=== Testing connectivity ==="
+            curl -f http://localhost:9000/ && echo "✅ Kittygram deployed successfully"
+          
+            echo "=== Deployment completed! ==="
+
+  send_message:
     runs-on: ubuntu-latest
     needs: deploy
     if: always()
