@@ -11,3 +11,5 @@ RUN pip install --upgrade pip && \
 COPY . .
 
 RUN chmod +x /app/entrypoint.sh
+
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "backend.wsgi:application"]
