@@ -29,6 +29,19 @@ jobs:
         with:
           python-version: '3.12'
       
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            python3-dev \
+            libjpeg-dev \
+            zlib1g-dev \
+            libfreetype6-dev \
+            liblcms2-dev \
+            libopenjp2-7-dev \
+            libtiff-dev \
+            libwebp-dev
+            
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip setuptools
@@ -126,7 +139,7 @@ jobs:
       - name: Build and push gateway
         uses: docker/build-push-action@v4
         with:
-          context: ./nginx/
+          context: ./gateway/
           push: true
           tags: gevork23/kittygram_gateway:latest
 
@@ -156,55 +169,53 @@ jobs:
           username: ${{ secrets.USER }}
           key: ${{ secrets.SSH_KEY }}
           script: |
-            # Установка docker-compose если нет
-            if ! command -v docker-compose &> /dev/null; then
-              echo "Installing docker-compose..."
-              sudo apt update
-              sudo apt install docker-compose -y
-            fi
-
             cd kittygram
-
+            
             # Проверяем наличие .env файла
             if [ ! -f ".env" ]; then
-              echo "ERROR: .env file not found! Please create .env file on the server."
-              echo "You can use .env.example as a template:"
-              echo "cp .env.example .env"
-              echo "Then edit .env with your settings."
+              echo "Creating .env file from example..."
+              cp .env.example .env
+              echo "Please edit .env file with your settings and restart"
               exit 1
             fi
-
-            echo "Using existing .env file"
-          
+            
             echo "=== Pulling latest images ==="
             sudo docker pull gevork23/kittygram_backend:latest || true
             sudo docker pull gevork23/kittygram_frontend:latest || true
             sudo docker pull gevork23/kittygram_gateway:latest || true
-          
+            
             echo "=== Stopping old containers ==="
             sudo docker-compose -f docker-compose.production.yml down || true
-          
+            
             echo "=== Starting new containers ==="
             sudo docker-compose -f docker-compose.production.yml up -d
-          
+            
             echo "=== Waiting for services ==="
-            sleep 30
-          
+            sleep 15
+            
             echo "=== Running migrations ==="
             sudo docker-compose -f docker-compose.production.yml exec -T backend python manage.py migrate --noinput
-          
+            
             echo "=== Collecting static ==="
             sudo docker-compose -f docker-compose.production.yml exec -T backend python manage.py collectstatic --noinput
-          
-            echo "=== Restarting to apply changes ==="
-            sudo docker-compose -f docker-compose.production.yml restart
-          
+            
+            # Копируем собранную статику Django в volume
+            echo "=== Copy Django static to volume ==="
+            sudo docker-compose -f docker-compose.production.yml exec -T backend cp -r /app/collected_static/. /backend_static/static/
+            
+            # Копируем React build в volume (это делает frontend контейнер через command)
+            echo "=== Waiting for frontend copy ==="
+            sleep 5
+            
+            echo "=== Restarting gateway ==="
+            sudo docker-compose -f docker-compose.production.yml restart gateway
+            
             echo "=== Checking services ==="
             sudo docker-compose -f docker-compose.production.yml ps
-          
+            
             echo "=== Testing connectivity ==="
             curl -f http://localhost:9000/ && echo "✅ Kittygram deployed successfully"
-          
+            
             echo "=== Deployment completed! ==="
 
   send_message:
@@ -223,5 +234,5 @@ jobs:
             Status: ${{ needs.deploy.result }}
             Repository: ${{ github.repository }}
             Branch: ${{ github.ref_name }}
-            Commit: ${GITHUB_SHA::7}
+            Commit: ${{ github.sha }}
             Site: https://oski.myftp.biz/

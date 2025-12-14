@@ -159,64 +159,64 @@ jobs:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USER }}
           key: ${{ secrets.SSH_KEY }}
-          source: "docker-compose.production.yml,.env.example,nginx/"
+          source: "docker-compose.production.yml,.env.example"
           target: "kittygram"
     
       - name: Executing remote ssh commands to deploy
         uses: appleboy/ssh-action@master
         with:
-        host: ${{ secrets.HOST }}
-        username: ${{ secrets.USER }}
-        key: ${{ secrets.SSH_KEY }}
-        script: |
-          cd kittygram
-      
-          # Проверяем наличие .env файла
-          if [ ! -f ".env" ]; then
-            echo "Creating .env file from example..."
-            cp .env.example .env
-            echo "Please edit .env file with your settings and restart"
-            exit 1
-          fi
-      
-          echo "=== Pulling latest images ==="
-          sudo docker pull gevork23/kittygram_backend:latest
-          sudo docker pull gevork23/kittygram_frontend:latest
-          sudo docker pull gevork23/kittygram_gateway:latest
-      
-          echo "=== Stopping old containers ==="
-          sudo docker-compose -f docker-compose.production.yml down
-      
-          echo "=== Starting new containers ==="
-          sudo docker-compose -f docker-compose.production.yml up -d
-      
-          echo "=== Waiting for services ==="
-          sleep 15
-      
-          echo "=== Running migrations ==="
-          sudo docker-compose -f docker-compose.production.yml exec -T backend python manage.py migrate --noinput
-      
-          echo "=== Collecting static ==="
-          sudo docker-compose -f docker-compose.production.yml exec -T backend python manage.py collectstatic --noinput
-      
-          # Копируем собранную статику Django в volume
-          echo "=== Copy Django static to volume ==="
-          sudo docker-compose -f docker-compose.production.yml exec -T backend cp -r /app/collected_static/. /app/static/
-      
-          # Копируем React build в volume (это делает frontend контейнер через command)
-          echo "=== Waiting for frontend copy ==="
-          sleep 5
-      
-          echo "=== Restarting gateway ==="
-          sudo docker-compose -f docker-compose.production.yml restart gateway
-      
-          echo "=== Checking services ==="
-          sudo docker-compose -f docker-compose.production.yml ps
-      
-          echo "=== Testing connectivity ==="
-          curl -f http://localhost:9000/ && echo "✅ Kittygram deployed successfully"
-      
-          echo "=== Deployment completed! ==="
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd kittygram
+            
+            # Проверяем наличие .env файла
+            if [ ! -f ".env" ]; then
+              echo "Creating .env file from example..."
+              cp .env.example .env
+              echo "Please edit .env file with your settings and restart"
+              exit 1
+            fi
+            
+            echo "=== Pulling latest images ==="
+            sudo docker pull gevork23/kittygram_backend:latest || true
+            sudo docker pull gevork23/kittygram_frontend:latest || true
+            sudo docker pull gevork23/kittygram_gateway:latest || true
+            
+            echo "=== Stopping old containers ==="
+            sudo docker-compose -f docker-compose.production.yml down || true
+            
+            echo "=== Starting new containers ==="
+            sudo docker-compose -f docker-compose.production.yml up -d
+            
+            echo "=== Waiting for services ==="
+            sleep 15
+            
+            echo "=== Running migrations ==="
+            sudo docker-compose -f docker-compose.production.yml exec -T backend python manage.py migrate --noinput
+            
+            echo "=== Collecting static ==="
+            sudo docker-compose -f docker-compose.production.yml exec -T backend python manage.py collectstatic --noinput
+            
+            # Копируем собранную статику Django в volume
+            echo "=== Copy Django static to volume ==="
+            sudo docker-compose -f docker-compose.production.yml exec -T backend cp -r /app/collected_static/. /backend_static/static/
+            
+            # Копируем React build в volume (это делает frontend контейнер через command)
+            echo "=== Waiting for frontend copy ==="
+            sleep 5
+            
+            echo "=== Restarting gateway ==="
+            sudo docker-compose -f docker-compose.production.yml restart gateway
+            
+            echo "=== Checking services ==="
+            sudo docker-compose -f docker-compose.production.yml ps
+            
+            echo "=== Testing connectivity ==="
+            curl -f http://localhost:9000/ && echo "✅ Kittygram deployed successfully"
+            
+            echo "=== Deployment completed! ==="
 
   send_message:
     runs-on: ubuntu-latest
@@ -234,5 +234,5 @@ jobs:
             Status: ${{ needs.deploy.result }}
             Repository: ${{ github.repository }}
             Branch: ${{ github.ref_name }}
-            Commit: ${GITHUB_SHA::7}
+            Commit: ${{ github.sha }}
             Site: https://oski.myftp.biz/
