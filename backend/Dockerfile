@@ -12,4 +12,5 @@ COPY . .
 
 RUN chmod +x /app/entrypoint.sh
 
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "backend.wsgi:application"]
+# ИСПРАВИТЬ ЭТУ СТРОКУ:
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "kittygram_backend.wsgi:application"]
