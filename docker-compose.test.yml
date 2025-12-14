@@ -1,0 +1,33 @@
+# docker-compose.test.yml
+version: '3.8'
+
+volumes:
+  test_static:
+
+services:
+  backend:
+    image: gevork23/kittygram_backend:latest
+    environment:
+      SECRET_KEY: "test-secret-key"
+      DEBUG: "True"
+      ALLOWED_HOSTS: "*"
+      DB_HOST: db
+      DB_PORT: 5432
+      POSTGRES_DB: test_kittygram
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+
+  frontend:
+    image: gevork23/kittygram_frontend:latest
+    volumes:
+      - test_static:/frontend_static
+
+  gateway:
+    image: gevork23/kittygram_gateway:latest
+    volumes:
+      - test_static:/staticfiles
+    ports:
+      - "9001:80"
+    depends_on:
+      - backend
+      - frontend

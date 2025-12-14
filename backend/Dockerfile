@@ -1,3 +1,4 @@
+# backend/Dockerfile
 FROM python:3.12
 
 WORKDIR /app
@@ -10,5 +11,3 @@ RUN pip install --upgrade pip && \
 COPY . .
 
 RUN chmod +x /app/entrypoint.sh
-
-ENTRYPOINT ["/app/entrypoint.sh"]

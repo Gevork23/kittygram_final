@@ -1,9 +1,9 @@
+# docker-compose.yml
 version: '3.8'
 
 volumes:
   pg_data:
-  django_static_volume:
-  media:
+  static:
 
 services:
   db:
@@ -20,19 +20,24 @@ services:
     build: ./backend/
     env_file: .env
     volumes:
-      - django_static_volume:/app/static
-      - media:/app/media
-    command: >
-      sh -c "python manage.py migrate --noinput &&
-             python manage.py collectstatic --noinput &&
-             cp -r /app/collected_static/. /app/static/ &&
-             gunicorn kittygram_backend.wsgi:application --bind 0.0.0.0:8000"
+      - static:/backend_static
     depends_on:
       - db
 
   frontend:
     build: ./frontend/
+    env_file: .env
+    command: cp -r /usr/share/nginx/html/. /frontend_static/
     volumes:
-      - django_static_volume:/usr/share/nginx/html/static/
+      - static:/frontend_static
+
+  gateway:
+    build: ./gateway/
+    env_file: .env
+    volumes:
+      - static:/staticfiles
     ports:
       - "9000:80"
+    depends_on:
+      - backend
+      - frontend

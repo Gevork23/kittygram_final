@@ -139,7 +139,7 @@ jobs:
       - name: Build and push gateway
         uses: docker/build-push-action@v4
         with:
-          context: ./nginx/
+          context: ./gateway/
           push: true
           tags: gevork23/kittygram_gateway:latest
 
@@ -159,66 +159,64 @@ jobs:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USER }}
           key: ${{ secrets.SSH_KEY }}
-          source: "docker-compose.production.yml,.env.example"
+          source: "docker-compose.production.yml,.env.example,nginx/"
           target: "kittygram"
     
       - name: Executing remote ssh commands to deploy
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USER }}
-          key: ${{ secrets.SSH_KEY }}
-          script: |
-            # Установка docker-compose если нет
-            if ! command -v docker-compose &> /dev/null; then
-              echo "Installing docker-compose..."
-              sudo apt update
-              sudo apt install docker-compose -y
-            fi
-
-            cd kittygram
-
-            # Проверяем наличие .env файла
-            if [ ! -f ".env" ]; then
-              echo "ERROR: .env file not found! Please create .env file on the server."
-              echo "You can use .env.example as a template:"
-              echo "cp .env.example .env"
-              echo "Then edit .env with your settings."
-              exit 1
-            fi
-
-            echo "Using existing .env file"
-          
-            echo "=== Pulling latest images ==="
-            sudo docker pull gevork23/kittygram_backend:latest || true
-            sudo docker pull gevork23/kittygram_frontend:latest || true
-            sudo docker pull gevork23/kittygram_gateway:latest || true
-          
-            echo "=== Stopping old containers ==="
-            sudo docker-compose -f docker-compose.production.yml down || true
-          
-            echo "=== Starting new containers ==="
-            sudo docker-compose -f docker-compose.production.yml up -d
-          
-            echo "=== Waiting for services ==="
-            sleep 30
-          
-            echo "=== Running migrations ==="
-            sudo docker-compose -f docker-compose.production.yml exec -T backend python manage.py migrate --noinput
-          
-            echo "=== Collecting static ==="
-            sudo docker-compose -f docker-compose.production.yml exec -T backend python manage.py collectstatic --noinput
-          
-            echo "=== Restarting to apply changes ==="
-            sudo docker-compose -f docker-compose.production.yml restart
-          
-            echo "=== Checking services ==="
-            sudo docker-compose -f docker-compose.production.yml ps
-          
-            echo "=== Testing connectivity ==="
-            curl -f http://localhost:9000/ && echo "✅ Kittygram deployed successfully"
-          
-            echo "=== Deployment completed! ==="
+        host: ${{ secrets.HOST }}
+        username: ${{ secrets.USER }}
+        key: ${{ secrets.SSH_KEY }}
+        script: |
+          cd kittygram
+      
+          # Проверяем наличие .env файла
+          if [ ! -f ".env" ]; then
+            echo "Creating .env file from example..."
+            cp .env.example .env
+            echo "Please edit .env file with your settings and restart"
+            exit 1
+          fi
+      
+          echo "=== Pulling latest images ==="
+          sudo docker pull gevork23/kittygram_backend:latest
+          sudo docker pull gevork23/kittygram_frontend:latest
+          sudo docker pull gevork23/kittygram_gateway:latest
+      
+          echo "=== Stopping old containers ==="
+          sudo docker-compose -f docker-compose.production.yml down
+      
+          echo "=== Starting new containers ==="
+          sudo docker-compose -f docker-compose.production.yml up -d
+      
+          echo "=== Waiting for services ==="
+          sleep 15
+      
+          echo "=== Running migrations ==="
+          sudo docker-compose -f docker-compose.production.yml exec -T backend python manage.py migrate --noinput
+      
+          echo "=== Collecting static ==="
+          sudo docker-compose -f docker-compose.production.yml exec -T backend python manage.py collectstatic --noinput
+      
+          # Копируем собранную статику Django в volume
+          echo "=== Copy Django static to volume ==="
+          sudo docker-compose -f docker-compose.production.yml exec -T backend cp -r /app/collected_static/. /app/static/
+      
+          # Копируем React build в volume (это делает frontend контейнер через command)
+          echo "=== Waiting for frontend copy ==="
+          sleep 5
+      
+          echo "=== Restarting gateway ==="
+          sudo docker-compose -f docker-compose.production.yml restart gateway
+      
+          echo "=== Checking services ==="
+          sudo docker-compose -f docker-compose.production.yml ps
+      
+          echo "=== Testing connectivity ==="
+          curl -f http://localhost:9000/ && echo "✅ Kittygram deployed successfully"
+      
+          echo "=== Deployment completed! ==="
 
   send_message:
     runs-on: ubuntu-latest
