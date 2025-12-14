@@ -1,7 +1,6 @@
 # requirements.txt
-# Добавьте в начало:
-setuptools>=60.0.0  # Для замены distutils
 
+setuptools>=60.0.0  # Для замены distutils
 Django==3.2.3
 djangorestframework==3.12.4
 djoser==2.1.0
@@ -12,5 +11,5 @@ gunicorn==20.1.0  # ДОБАВЬТЕ gunicorn!
 pytest==6.2.4
 pytest-django==4.4.0
 pytest-pythonpath==0.7.3
-PyYAML==6.0
+PyYAML>=6.0.1
 flake8==6.0.0
