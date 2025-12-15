@@ -42,6 +42,10 @@ mkdir -p /app/media\n\
 exec gunicorn kittygram_backend.wsgi:application --bind 0.0.0.0:8000 --workers=3\n\
 ' > /app/docker-entrypoint.sh
 
+<<<<<<< HEAD
 RUN chmod +x /app/docker-entrypoint.sh
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
+=======
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "kittygram_backend.wsgi:application"]
+>>>>>>> d052e2252adf96605e0ef22988bdad463bbd1cfd
