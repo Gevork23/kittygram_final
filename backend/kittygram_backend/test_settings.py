@@ -2,7 +2,6 @@ import sys
 from os.path import abspath, dirname
 from pathlib import Path
 
-# Добавляем родительскую директорию в путь Python
 sys.path.insert(0, dirname(dirname(abspath(__file__))))
 
 try:
@@ -18,7 +17,6 @@ for attr in dir(base_settings):
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Переопределяем только нужные настройки
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
