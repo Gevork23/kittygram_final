@@ -143,103 +143,103 @@ jobs:
           push: true
           tags: gevork23/kittygram_nginx:latest
 
-deploy:
-  runs-on: ubuntu-latest
-  needs: 
-    - build_and_push_backend
-    - build_and_push_frontend
-    - build_and_push_nginx
-  steps:
-    - name: Checkout repo
-      uses: actions/checkout@v3
-  
-    - name: Copy files via ssh
-      uses: appleboy/scp-action@master
-      with:
-        host: ${{ secrets.HOST }}
-        username: ${{ secrets.USER }}
-        key: ${{ secrets.SSH_KEY }}
-        source: "docker-compose.production.yml,.env.example"
-        target: "kittygram"
-  
-    - name: Executing remote ssh commands to deploy
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.HOST }}
-        username: ${{ secrets.USER }}
-        key: ${{ secrets.SSH_KEY }}
-        script: |
-          cd kittygram
-          
-          # Проверяем наличие .env файла
-          if [ ! -f ".env" ]; then
-            echo "Creating .env file from example..."
-            cp .env.example .env
-            echo "Please edit .env file with your settings and restart"
-            exit 1
-          fi
-          
-          echo "=== Pulling latest images ==="
-          sudo docker pull gevork23/kittygram_backend:latest || true
-          sudo docker pull gevork23/kittygram_frontend:latest || true
-          sudo docker pull gevork23/kittygram_nginx:latest || true
-          
-          echo "=== Stopping old containers ==="
-          sudo docker compose -f docker-compose.production.yml down || true
-          
-          echo "=== Creating volumes ==="
-          sudo docker volume create pg_data_production 2>/dev/null || true
-          sudo docker volume create static_volume 2>/dev/null || true
-          sudo docker volume create media_volume 2>/dev/null || true
-          
-          echo "=== Starting new containers ==="
-          sudo docker compose -f docker-compose.production.yml up -d
-          
-          echo "=== Waiting for services ==="
-          sleep 20
-          
-          echo "=== Checking backend logs ==="
-          sudo docker compose -f docker-compose.production.yml logs backend --tail=20
-          
-          echo "=== Running migrations (if needed) ==="
-          sudo docker compose -f docker-compose.production.yml exec -T backend python manage.py migrate --noinput 2>/dev/null || echo "Migrations already applied or container not ready"
-          
-          echo "=== Waiting for backend to be ready ==="
-          for i in {1..30}; do
-            if sudo docker compose -f docker-compose.production.yml exec -T backend curl -f http://localhost:8000/api/ >/dev/null 2>&1; then
-              echo "Backend is ready!"
-              break
+  deploy:
+    runs-on: ubuntu-latest
+    needs: 
+      - build_and_push_backend
+      - build_and_push_frontend
+      - build_and_push_nginx
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+    
+      - name: Copy files via ssh
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SSH_KEY }}
+          source: "docker-compose.production.yml,.env.example"
+          target: "kittygram"
+    
+      - name: Executing remote ssh commands to deploy
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd kittygram
+            
+            # Проверяем наличие .env файла
+            if [ ! -f ".env" ]; then
+              echo "Creating .env file from example..."
+              cp .env.example .env
+              echo "Please edit .env file with your settings and restart"
+              exit 1
             fi
-            echo "Waiting for backend... ($i/30)"
-            sleep 2
-          done
+            
+            echo "=== Pulling latest images ==="
+            sudo docker pull gevork23/kittygram_backend:latest || true
+            sudo docker pull gevork23/kittygram_frontend:latest || true
+            sudo docker pull gevork23/kittygram_nginx:latest || true
+            
+            echo "=== Stopping old containers ==="
+            sudo docker compose -f docker-compose.production.yml down || true
+            
+            echo "=== Creating volumes ==="
+            sudo docker volume create pg_data_production 2>/dev/null || true
+            sudo docker volume create static_volume 2>/dev/null || true
+            sudo docker volume create media_volume 2>/dev/null || true
+            
+            echo "=== Starting new containers ==="
+            sudo docker compose -f docker-compose.production.yml up -d
+            
+            echo "=== Waiting for services ==="
+            sleep 20
+            
+            echo "=== Checking backend logs ==="
+            sudo docker compose -f docker-compose.production.yml logs backend --tail=20
+            
+            echo "=== Running migrations (if needed) ==="
+            sudo docker compose -f docker-compose.production.yml exec -T backend python manage.py migrate --noinput 2>/dev/null || echo "Migrations already applied or container not ready"
+            
+            echo "=== Waiting for backend to be ready ==="
+            for i in {1..30}; do
+              if sudo docker compose -f docker-compose.production.yml exec -T backend curl -f http://localhost:8000/api/ >/dev/null 2>&1; then
+                echo "Backend is ready!"
+                break
+              fi
+              echo "Waiting for backend... ($i/30)"
+              sleep 2
+            done
 
-          echo "=== Collecting static ==="
-          sudo docker compose -f docker-compose.production.yml exec -T backend python manage.py collectstatic --noinput 2>/dev/null || echo "Static collection failed, retrying..."
-          sleep 5
-          sudo docker compose -f docker-compose.production.yml exec -T backend python manage.py collectstatic --noinput
-          
-          # Копируем медиа директорию если нужно
-          echo "=== Ensuring media directory ==="
-          sudo docker compose -f docker-compose.production.yml exec -T backend mkdir -p /app/media
-          sudo docker compose -f docker-compose.production.yml exec -T backend chmod -R 755 /app/media
-          
-          echo "=== Restarting containers ==="
-          sudo docker compose -f docker-compose.production.yml restart backend frontend nginx
-          
-          echo "=== Final wait ==="
-          sleep 10
-          
-          echo "=== Checking services ==="
-          sudo docker compose -f docker-compose.production.yml ps
-          
-          echo "=== Testing connectivity ==="
-          curl -f http://localhost:9000/ && echo "✅ Kittygram deployed successfully" || echo "⚠️  Could not connect, checking logs..."
-          
-          echo "=== Checking logs ==="
-          sudo docker compose -f docker-compose.production.yml logs --tail=20
-          
-          echo "=== Deployment completed! ==="
+            echo "=== Collecting static ==="
+            sudo docker compose -f docker-compose.production.yml exec -T backend python manage.py collectstatic --noinput 2>/dev/null || echo "Static collection failed, retrying..."
+            sleep 5
+            sudo docker compose -f docker-compose.production.yml exec -T backend python manage.py collectstatic --noinput
+            
+            # Копируем медиа директорию если нужно
+            echo "=== Ensuring media directory ==="
+            sudo docker compose -f docker-compose.production.yml exec -T backend mkdir -p /app/media
+            sudo docker compose -f docker-compose.production.yml exec -T backend chmod -R 755 /app/media
+            
+            echo "=== Restarting containers ==="
+            sudo docker compose -f docker-compose.production.yml restart backend frontend nginx
+            
+            echo "=== Final wait ==="
+            sleep 10
+            
+            echo "=== Checking services ==="
+            sudo docker compose -f docker-compose.production.yml ps
+            
+            echo "=== Testing connectivity ==="
+            curl -f http://localhost:9000/ && echo "✅ Kittygram deployed successfully" || echo "⚠️  Could not connect, checking logs..."
+            
+            echo "=== Checking logs ==="
+            sudo docker compose -f docker-compose.production.yml logs --tail=20
+            
+            echo "=== Deployment completed! ==="
 
   send_message:
     runs-on: ubuntu-latest
