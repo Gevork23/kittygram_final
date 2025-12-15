@@ -1,9 +1,9 @@
-# docker-compose.yml
 version: '3.8'
 
 volumes:
   pg_data:
   static:
+  media:
 
 services:
   db:
@@ -15,29 +15,33 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    restart: unless-stopped
 
   backend:
     build: ./backend/
     env_file: .env
     volumes:
       - static:/backend_static
+      - media:/app/media
     depends_on:
       - db
 
   frontend:
     build: ./frontend/
     env_file: .env
-    command: cp -r /usr/share/nginx/html/. /frontend_static/
+    command: sh -c "cp -r /usr/share/nginx/html/. /frontend_static/ && tail -f /dev/null"
     volumes:
       - static:/frontend_static
 
-  gateway:
-    build: ./gateway/
+  nginx:
+    build: ./nginx/
     env_file: .env
     volumes:
       - static:/staticfiles
+      - media:/mediafiles
     ports:
       - "9000:80"
     depends_on:
       - backend
       - frontend
+      

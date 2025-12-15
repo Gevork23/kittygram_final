@@ -1,4 +1,5 @@
 # flake8: noqa
+# settings.py
 import os
 from pathlib import Path
 
@@ -95,7 +96,7 @@ USE_L10N = True
 USE_TZ = True
 
 STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'collected_static')  # ИЗМЕНИТЬ СЮДА
+STATIC_ROOT = os.path.join(BASE_DIR, 'collected_static')
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
